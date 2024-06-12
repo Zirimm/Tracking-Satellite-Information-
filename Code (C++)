@@ -1,0 +1,170 @@
+What does this program do: /*Chelsea Ogbede
+  1337 
+  3/6/2023   
+*/
+
+#include <string>
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <stdint.h>
+#include <float.h>
+#include <math.h>
+#include <stdio.h>
+
+using namespace std;
+
+//Function prototypes
+#define GroundStationOutputChannel cout 
+#define masterInfoSatellite masterInformation.masterUnion.satelliteInformation
+#define masterInfoExperiment masterInformation.masterUnion.experimentInformation
+#define infoStoredArrayatindexSatellite infoStoredArray[index].masterUnion.satelliteInformation
+#define infoStoredArrayatindexExperiment infoStoredArray[index].masterUnion.experimentInformation
+
+const string TELEMETRY_RECIEVER_INPUT_CHANNEL = "inputDataAntenna.txt";
+
+enum class MESSAGE_ID { SATELLITE_INFORMATION_MESSAGE = 1, EXPERIMENT_INFORMATION_MESSAGE = 2, SEND_SUMMARY_MESSAGE = 3 };
+MESSAGE_ID messageID;
+
+enum InformationType { SATELLITE_INFORMATION, EXPERIMENT_INFORMATION, EMPTY };
+const uint8_t ARRAY_DATA_STORAGE_SIZE = 5;
+
+struct SatelliteInformation 
+{
+    float_t temperature;
+    float_t voltage;
+};
+
+struct ExperimentInformation 
+{
+    uint16_t radiationCount;
+    uint16_t latchupEventsCount;
+};
+
+union MasterUnion
+{
+SatelliteInformation satelliteInformation;
+ExperimentInformation experimentInformation;
+};
+
+struct MasterInformation 
+{
+    InformationType infotype;
+    MasterUnion masterUnion;
+};
+
+int main()
+{
+    MasterInformation infoStoredArray[ARRAY_DATA_STORAGE_SIZE];
+    uint8_t entryPositionIndex = 0;
+    MasterInformation masterInformation;
+    ifstream telemetryInputAntennaReceiverChannel;
+    
+    telemetryInputAntennaReceiverChannel.open(TELEMETRY_RECIEVER_INPUT_CHANNEL, ios::in);
+    if (telemetryInputAntennaReceiverChannel.fail())
+    {
+        cout << "File " << TELEMETRY_RECIEVER_INPUT_CHANNEL << " could not be opened !" << endl;
+        cout << "Press enter key once or twice to continue ... "; cin.ignore(); cin.get();
+        exit(EXIT_FAILURE);
+    }
+    GroundStationOutputChannel << setprecision(1) << fixed << showpoint;
+    
+    for (uint8_t index = 0; index < ARRAY_DATA_STORAGE_SIZE; index++)
+    infoStoredArray[index].infotype = EMPTY;
+    
+    uint16_t messageId;
+    while (telemetryInputAntennaReceiverChannel >> messageId)
+    {
+        messageID = MESSAGE_ID(messageId);
+        switch (messageID) 
+        {
+        case MESSAGE_ID::SATELLITE_INFORMATION_MESSAGE:
+            masterInformation.infotype = SATELLITE_INFORMATION;
+            telemetryInputAntennaReceiverChannel >>
+                masterInfoSatellite.temperature >>
+                masterInfoSatellite.voltage;
+            infoStoredArray[entryPositionIndex] = masterInformation;
+            entryPositionIndex = (entryPositionIndex == 4) ? 0 : ++entryPositionIndex;
+            break;
+            
+        case MESSAGE_ID::EXPERIMENT_INFORMATION_MESSAGE:
+            masterInformation.infotype = EXPERIMENT_INFORMATION;
+            telemetryInputAntennaReceiverChannel >>
+                masterInfoExperiment.radiationCount >>
+                masterInfoExperiment.latchupEventsCount;
+            infoStoredArray[entryPositionIndex] = masterInformation;
+            entryPositionIndex = (entryPositionIndex == 4) ? 0 : ++entryPositionIndex;
+            break;
+            
+        case MESSAGE_ID::SEND_SUMMARY_MESSAGE:
+            float_t minTemperature = -50, 
+                maxTemperature = 212;
+            float_t maxVoltage = 100.0,
+                minVoltage = 0.0;
+                
+            uint16_t totalRadiationCount = 0,
+            totalLatchupEventCount = 0,
+            infoSICount = 0,
+            infoEICount = 0;
+            for (uint8_t index = 0; index < ARRAY_DATA_STORAGE_SIZE; index++)
+            {
+                switch (infoStoredArray[index].infotype)
+                {
+                    
+                case SATELLITE_INFORMATION:
+                    GroundStationOutputChannel <<
+                        "Temperature : " <<
+                        infoStoredArrayatindexSatellite.temperature << endl <<
+                        "Voltage : " <<
+                        infoStoredArrayatindexSatellite.voltage << endl << endl;
+                        infoSICount++;
+                        
+                        if (maxTemperature < infoStoredArrayatindexSatellite.temperature)
+                            maxTemperature = infoStoredArrayatindexSatellite.temperature;
+                            
+                        if (minTemperature > infoStoredArrayatindexSatellite.temperature)
+                            minTemperature = infoStoredArrayatindexSatellite.temperature;
+                            
+                        if (maxVoltage < infoStoredArrayatindexSatellite.voltage)
+                            maxVoltage = infoStoredArrayatindexSatellite.voltage;
+                        
+                        if (minVoltage > infoStoredArrayatindexSatellite.voltage)
+                            minVoltage = infoStoredArrayatindexSatellite.voltage;
+                        break;
+                        
+                case EXPERIMENT_INFORMATION:
+                    GroundStationOutputChannel <<
+                    "Radiation Count : " <<
+                    infoStoredArrayatindexExperiment.radiationCount << endl <<
+                    "Latchup Event Count : " <<
+                    infoStoredArrayatindexExperiment.latchupEventsCount << endl << endl;
+                        infoEICount++;
+                
+                        totalRadiationCount += infoStoredArrayatindexExperiment.radiationCount;
+                        totalLatchupEventCount += infoStoredArrayatindexExperiment.latchupEventsCount;
+                break;
+                    
+                case EMPTY:
+                break;
+                    }
+                }
+                
+                GroundStationOutputChannel <<
+                "Summary Information" << endl <<
+                "--------------------" << endl <<
+                "Number of Satellite Information Records: " << infoSICount << endl <<
+                "Number of Experiment Information Records: " << infoEICount << endl <<
+                "Total Radiation Count : " << totalRadiationCount << endl <<
+                "Total Latchup Event Count : " << totalLatchupEventCount << endl << 
+    
+                "Maximum Temperature : " << maxTemperature << endl <<
+                "Minimum Temperature : " << minTemperature << endl << 
+                "Maximum Voltage : " << maxVoltage << endl <<
+                "Minimum Voltage : " << minVoltage << endl << endl;
+                
+                cout << "Press enter key once or twice to continue ... "; cin.ignore(); cin.get();
+            }
+        }
+        
+    return(EXIT_SUCCESS);
+    }
